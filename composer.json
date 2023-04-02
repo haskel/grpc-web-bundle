@@ -1,0 +1,26 @@
+{
+    "name": "haskel/grpc-web-bundle",
+    "type": "symfony-bundle",
+    "description": "Symfony bundle for gRPC-Web protocol",
+    "keywords": ["grpc", "grpc-web"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Pavel Haskel",
+            "email": "haskel.pavel@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">=8.1",
+        "ext-grpc": "*",
+        "grpc/grpc": "^1.41",
+        "google/protobuf": "^3.22",
+        "symfony/framework-bundle": "^6.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Haskel\\GrpcWebBundle\\": ""
+        }
+    }
+}
