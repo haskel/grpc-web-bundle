@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Haskel\GrpcWebBundle;
+namespace Haskel\GrpcWebBundle;
 
 use Haskel\GrpcWebBundle\Message\StatusCode;
 use Google\Protobuf\GPBEmpty;

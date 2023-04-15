@@ -2,11 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Haskel\GrpcWebBundle\Listener;
+namespace Haskel\GrpcWebBundle\Listener;
 
 use Haskel\GrpcWebBundle\Exception\BaseGrpcException;
 use Haskel\GrpcWebBundle\GrpcResponse;
 use Google\Protobuf\Internal\Message;
+use Haskel\GrpcWebBundle\Message\LengthPrefixedMessage;
+use Haskel\GrpcWebBundle\Message\MetadataRecord;
+use Haskel\GrpcWebBundle\Message\StatusCode;
+use Haskel\GrpcWebBundle\Message\StatusMessage;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -21,36 +25,25 @@ class ResponseListener
         $result = $event->getControllerResult();
         if ($result instanceof Message) {
 
-            $trailers = [
-                'grpc-status' => '0',
-                'grpc-message' => 'OK',
-            ];
+            $contentType = $event->getRequest()->headers->get('content-type');
+            if (!$contentType || !str_starts_with($contentType, 'application/grpc')) {
+                return;
+            }
 
-//            $response = new StreamedResponse(
-//                function () use ($result) {
-//                    echo (new LengthPrefixedMessage($result->serializeToString()))->encode();
-//                },
-//                Response::HTTP_OK,
-//                [
-//                    'Content-Type' => 'application/grpc-web+proto',
-//                    'grpc-encoding' => 'identity',
-//                    'Trailer' => implode(', ', array_keys($trailers)),
-//                ]
-//            );
+            [$protocol, $encoding] = explode('+', $contentType, 2);
 
-            $payload = (new LengthPrefixedMessage($result->serializeToString()))->encode();
+            $message = (new LengthPrefixedMessage($result->serializeToString()))->encode();
+            $payload = match ($protocol) {
+                'application/grpc-web-text' => base64_decode($message),
+                'application/grpc-web' => $message,
+            };
+
             $response = new Response(
-                $payload,
-//                base64_encode($payload),
-//                base64_encode((new LengthPrefixedMessage($result->serializeToString()))->encode()),
-//                $result->serializeToString(),
+                $message,
                 Response::HTTP_OK,
                 [
                     'Content-Length' => strlen($payload),
-                    'Content-Type' => 'application/grpc-web+proto',
-//                    'Content-Type' => 'application/grpc-web-text',
-//                    'content-encoding' => 'identity',
-//                    'Trailer' => implode(', ', array_keys($trailers)),
+                    'Content-Type' => $contentType,
                 ]
             );
 
@@ -95,17 +88,17 @@ class ResponseListener
                     $result[$key] = $value->encode();
                 }
                 if ($value instanceof StatusCode) {
-                    $result[$key] = $value->getValue();
+                    $result[$key] = $value->value;
                 }
                 if ($value instanceof StatusMessage) {
-                    $result[$key] = $value->getValue();
+                    $result[$key] = $value->message;
                 }
                 if ($value instanceof MetadataRecord) {
-                    $result[$key] = $value->getValue();
+                    $result[$key] = $value->value;
                 }
             }
 
-            $event->setResponse($result);
+            $event->setResponse(new Response($result));
         }
     }
 
