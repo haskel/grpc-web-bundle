@@ -6,6 +6,6 @@ namespace Haskel\GrpcWebBundle\Message;
 
 enum CompressedFlag: int
 {
-    case Uncompressed = 0;
-    case Compressed = 1;
+    case Uncompressed = 0x00;
+    case Compressed = 0x80;
 }

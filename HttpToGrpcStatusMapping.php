@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 class HttpToGrpcStatusMapping
 {
     public const MAPPING = [
-        [Response::HTTP_BAD_REQUEST, StatusCode::InvalidArgument],
+        [Response::HTTP_BAD_REQUEST => StatusCode::InvalidArgument],
         [Response::HTTP_UNAUTHORIZED => StatusCode::Unauthenticated],
         [Response::HTTP_FORBIDDEN => StatusCode::PermissionDenied],
         [Response::HTTP_NOT_FOUND => StatusCode::NotFound],

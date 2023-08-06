@@ -5,3 +5,16 @@ services:
         tags:
             - { name: 'kernel.event_listener', event: 'kernel.view', method: 'onKernelView', priority: 0 }
             - { name: 'kernel.event_listener', event: 'kernel.exception', method: 'onKernelException', priority: 0 }
+
+    Haskel\GrpcWebBundle\Listener\ControllerListener:
+        tags:
+            - { name: 'kernel.event_listener', event: 'kernel.controller', method: 'onKernelController', priority: 0 }
+
+    Haskel\GrpcWebBundle\Routing\GrpcServiceRouteLoader:
+        tags:
+            - { name: 'routing.loader' }
+        arguments:
+            $fileLocator: '@file_locator'
+            $loader: '@routing.loader.annotation'
+
+        

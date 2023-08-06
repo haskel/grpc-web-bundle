@@ -8,7 +8,7 @@ use Haskel\GrpcWebBundle\DependencyInjection\RouterCompilerPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
-class GrpcBundle extends Bundle
+class GrpcWebBundle extends Bundle
 {
     public function build(ContainerBuilder $container)
     {

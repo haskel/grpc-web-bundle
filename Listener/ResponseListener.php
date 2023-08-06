@@ -4,118 +4,153 @@ declare(strict_types=1);
 
 namespace Haskel\GrpcWebBundle\Listener;
 
-use Haskel\GrpcWebBundle\Exception\BaseGrpcException;
+use Google\Protobuf\GPBEmpty;
+use Haskel\GrpcWebBundle\Constant\RequestAttribute;
+use Haskel\GrpcWebBundle\Exception\AbortedException;
+use Haskel\GrpcWebBundle\Exception\AlreadyExistsException;
+use Haskel\GrpcWebBundle\Exception\CancelledException;
+use Haskel\GrpcWebBundle\Exception\DataLossException;
+use Haskel\GrpcWebBundle\Exception\DeadlineExceededException;
+use Haskel\GrpcWebBundle\Exception\FailedPreconditionException;
+use Haskel\GrpcWebBundle\Exception\InternalException;
+use Haskel\GrpcWebBundle\Exception\InvalidArgumentException;
+use Haskel\GrpcWebBundle\Exception\NotFoundException;
+use Haskel\GrpcWebBundle\Exception\OutOfRangeException;
+use Haskel\GrpcWebBundle\Exception\PermissionDeniedException;
+use Haskel\GrpcWebBundle\Exception\ResourceExhaustedException;
+use Haskel\GrpcWebBundle\Exception\UnauthenticatedException;
+use Haskel\GrpcWebBundle\Exception\UnavailableException;
+use Haskel\GrpcWebBundle\Exception\UnimplementedException;
+use Haskel\GrpcWebBundle\Exception\UnknownErrorException;
 use Haskel\GrpcWebBundle\GrpcResponse;
 use Google\Protobuf\Internal\Message;
+use Haskel\GrpcWebBundle\Message\GrpcMode;
 use Haskel\GrpcWebBundle\Message\LengthPrefixedMessage;
 use Haskel\GrpcWebBundle\Message\MetadataRecord;
 use Haskel\GrpcWebBundle\Message\StatusCode;
 use Haskel\GrpcWebBundle\Message\StatusMessage;
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Psr\Log\LoggerInterface;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
+use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\Event\ViewEvent;
-use Symfony\Component\HttpKernel\KernelEvents;
 
-#[AsEventListener(KernelEvents::VIEW)]
 class ResponseListener
 {
+    /** @var array<string, StatusCode> */
+    protected array $exceptionToCodeMap = [
+        CancelledException::class => StatusCode::Cancelled,
+        UnknownErrorException::class => StatusCode::Unknown,
+        InvalidArgumentException::class => StatusCode::InvalidArgument,
+        DeadlineExceededException::class => StatusCode::DeadlineExceeded,
+        NotFoundException::class => StatusCode::NotFound,
+        AlreadyExistsException::class => StatusCode::AlreadyExists,
+        PermissionDeniedException::class => StatusCode::PermissionDenied,
+        ResourceExhaustedException::class => StatusCode::ResourceExhausted,
+        FailedPreconditionException::class => StatusCode::FailedPrecondition,
+        AbortedException::class => StatusCode::Aborted,
+        OutOfRangeException::class => StatusCode::OutOfRange,
+        UnimplementedException::class => StatusCode::Unimplemented,
+        InternalException::class => StatusCode::Internal,
+        UnavailableException::class => StatusCode::Unavailable,
+        DataLossException::class => StatusCode::DataLoss,
+        UnauthenticatedException::class => StatusCode::Unauthenticated,
+    ];
+
+    /** @var array<string, callable> */
+    protected array $exceptionHandlers = [];
+
+    public function __construct(private LoggerInterface $logger)
+    {
+    }
+
     public function onKernelView(ViewEvent $event): void
     {
         $result = $event->getControllerResult();
-        if ($result instanceof Message) {
 
-            $contentType = $event->getRequest()->headers->get('content-type');
-            if (!$contentType || !str_starts_with($contentType, 'application/grpc')) {
-                return;
-            }
-
-            [$protocol, $encoding] = explode('+', $contentType, 2);
-
-            $message = (new LengthPrefixedMessage($result->serializeToString()))->encode();
-            $payload = match ($protocol) {
-                'application/grpc-web-text' => base64_decode($message),
-                'application/grpc-web' => $message,
-            };
-
-            $response = new Response(
-                $message,
-                Response::HTTP_OK,
-                [
-                    'Content-Length' => strlen($payload),
-                    'Content-Type' => $contentType,
-                ]
-            );
-
-            $response->headers->set('grpc-status', '0');
-            $response->headers->set('grpc-message', 'OK');
-
-            $event->setResponse($response);
+        if ($result instanceof GrpcResponse) {
+            $event->setResponse($result);
+            return;
         }
 
         if ($result instanceof LengthPrefixedMessage) {
-            $response = new Response(
-                $result->encode(),
-                Response::HTTP_OK,
-                [
-                    'Content-Type' => 'application/grpc-web+proto',
-                    'grpc-encoding' => 'identity',
-                ]
-            );
-
-            $event->setResponse($response);
+            throw new RuntimeException('LengthPrefixedMessage as return type is not implemented');
         }
 
-        if ($result instanceof GrpcResponse) {
-            $response = new Response(
-                $result->getMessage()->serializeToString(),
-                Response::HTTP_OK,
-                [
-                    'Content-Type' => 'application/grpc-web+proto',
-                    'grpc-encoding' => 'identity',
-                ]
-            );
-
-            $event->setResponse($response);
+        if ($result instanceof Message) {
+            $event->setResponse(new GrpcResponse($result));
+            return;
         }
 
-        if (is_array($result)) {
+        if (is_iterable($result)) {
+            $response = new GrpcResponse();
+
             foreach ($result as $key => $value) {
                 if ($value instanceof Message) {
-                    $result[$key] = $value->serializeToString();
-                }
-                if ($value instanceof LengthPrefixedMessage) {
-                    $result[$key] = $value->encode();
+                    $response->setMessage($value);
                 }
                 if ($value instanceof StatusCode) {
-                    $result[$key] = $value->value;
+                    $response->setStatus($value);
                 }
                 if ($value instanceof StatusMessage) {
-                    $result[$key] = $value->message;
+                    $response->setStatusMessage($value->message);
                 }
                 if ($value instanceof MetadataRecord) {
-                    $result[$key] = $value->value;
+                    $response->addMetadata($value->key, $value->value);
                 }
             }
 
-            $event->setResponse(new Response($result));
+            $event->setResponse($response);
         }
     }
 
     public function onKernelException(ExceptionEvent $event): void
     {
         $exception = $event->getThrowable();
-        if ($exception instanceof BaseGrpcException) {
-            $response = new Response(
-                $exception->getMessage(),
-                Response::HTTP_BAD_REQUEST,
-                [
-                    'Content-Type' => 'application/grpc-web+proto',
-                    'grpc-encoding' => 'identity',
-                ]
-            );
 
+        $this->logger->error($exception->getMessage(), ['exception' => $exception]);
+
+        if (isset($this->exceptionHandlers[$exception::class])) {
+            $response = call_user_func($this->exceptionHandlers[$exception::class], $exception);
+            $response ??= new GrpcResponse(status: StatusCode::Unknown,statusMessage: 'Unknown error');
             $event->setResponse($response);
+            return;
         }
+
+        $responseMessage = new GPBEmpty();
+        $statusCode = $this->exceptionToCodeMap[$exception::class] ?? StatusCode::Unknown;
+
+        $response = new GrpcResponse(
+            $responseMessage,
+            $statusCode,
+            $exception->getMessage(),
+        );
+
+        $event->setResponse($response);
+    }
+
+    public function onKernelResponse(ResponseEvent $event): void
+    {
+        $response = $event->getResponse();
+        if (!$response instanceof GrpcResponse) {
+            return;
+        }
+
+        $type = GrpcMode::getByContentType(
+            $event->getRequest()->headers->get('content-type')
+        );
+
+        $response->setType($type);
+    }
+
+    public function addExceptionToCodeMapping(string $exceptionClass, StatusCode $code): void
+    {
+        $this->exceptionToCodeMap[$exceptionClass] = $code;
+    }
+
+    public function addExceptionHandler(string $exceptionClass, callable $handler): void
+    {
+        $this->exceptionHandlers[$exceptionClass] = $handler;
     }
 }
