@@ -102,6 +102,6 @@ class GrpcServiceRouteLoader extends AnnotationDirectoryLoader
 
     public function supports($resource, string $type = null): bool
     {
-        return 'grpc' === $type;
+        return 'grpc-web' === $type;
     }
 }

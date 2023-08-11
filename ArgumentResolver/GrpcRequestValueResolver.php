@@ -34,7 +34,7 @@ class GrpcRequestValueResolver implements ValueResolverInterface
             return;
         }
 
-        [$protocol, $encoding] = explode('+', $contentType, 2);
+        [$protocol, $encoding] = explode('+', $contentType, 2) + [null, null];
 
         if ($protocol === ProtocolContentType::GRPC) {
             throw new BaseGrpcException('Can\'t process common gRPC. Only gRPC-Web is supported');

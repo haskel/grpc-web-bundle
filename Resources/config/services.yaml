@@ -1,0 +1,41 @@
+services:
+  haskel.grpc_web.argument_resolver.grpc_request_value_resolver:
+    class: 'Haskel\GrpcWebBundle\ArgumentResolver\GrpcRequestValueResolver'
+    tags:
+      - { name: 'controller.argument_value_resolver', priority: 0 }
+  
+  haskel.grpc_web.listener.response_listener:
+    class: 'Haskel\GrpcWebBundle\Listener\ResponseListener'
+    arguments:
+      $logger: '@logger'
+    tags:
+      - { name: 'kernel.event_listener', event: 'kernel.view', method: 'onKernelView', priority: 0 }
+      - { name: 'kernel.event_listener', event: 'kernel.exception', method: 'onKernelException', priority: 0 }
+
+  haskel.grpc_web.listener.controller_listener:
+    class: 'Haskel\GrpcWebBundle\Listener\ControllerListener'
+    tags:
+      - { name: 'kernel.event_listener', event: 'kernel.controller', method: 'onKernelController', priority: 0 }
+
+  haskel.grpc_web.routing.grpc_service_route_loader:
+    class: 'Haskel\GrpcWebBundle\Routing\GrpcServiceRouteLoader'
+    tags:
+      - { name: 'routing.loader' }
+    arguments:
+      $locator: '@file_locator'
+      $loader: '@routing.loader.annotation'
+  
+  haskel.grpc_web.default_jwt_cookie_builder:
+    class: 'Haskel\GrpcWebBundle\Security\DefaultJwtCookieBuilder'
+    arguments:
+      $jwtManager: '@lexik_jwt_authentication.jwt_manager'
+  
+  haskel.grpc_web.security.grpc_login_authenticator:
+    class: 'Haskel\GrpcWebBundle\Security\GrpcLoginAuthenticator'
+    arguments:
+      $userProvider: '@security.user.provider.concrete.database_user_provider'
+      $dispatcher: '@event_dispatcher'
+      $jwtCookieBuilder: '@haskel.grpc_web.default_jwt_cookie_builder'
+    tags:
+      - { name: 'security.authenticator' }
+        

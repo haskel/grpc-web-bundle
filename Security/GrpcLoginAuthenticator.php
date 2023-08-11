@@ -14,6 +14,7 @@ use Haskel\GrpcWebBundle\Message\StatusCode;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationSuccessEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Events;
 use LogicException;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
@@ -101,7 +102,7 @@ class GrpcLoginAuthenticator implements InteractiveAuthenticatorInterface
 
         $jwtCookie = $this->jwtCookieBuilder->build($user);
 
-        $response = $this->buildSuccessResponse($user, $request);
+        $response = $this->buildSuccessResponse($user, $request, $jwtCookie);
         $response->headers->setCookie($jwtCookie);
 
         $this->dispatcher->dispatch(
@@ -112,10 +113,10 @@ class GrpcLoginAuthenticator implements InteractiveAuthenticatorInterface
         return $response;
     }
 
-    protected function buildSuccessResponse(UserInterface $user, Request $request): GrpcResponse
+    protected function buildSuccessResponse(UserInterface $user, Request $request, Cookie $jwtCookie): GrpcResponse
     {
         if (is_callable($this->successResponseBuilder)) {
-            return call_user_func($this->successResponseBuilder, $user, $request);
+            return call_user_func($this->successResponseBuilder, $user, $request, $jwtCookie);
         }
 
         if ($this->successResponseBuilder instanceof GrpcResponse) {
@@ -123,7 +124,7 @@ class GrpcLoginAuthenticator implements InteractiveAuthenticatorInterface
         }
 
         if ($this->successResponseBuilder instanceof GrpcResponseBuilderInterface) {
-            return $this->successResponseBuilder->build($user, $request);
+            return $this->successResponseBuilder->build($user, $request, $jwtCookie);
         }
 
         return new GrpcResponse(new GpbEmpty(), StatusCode::Ok);
