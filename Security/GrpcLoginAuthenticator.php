@@ -8,7 +8,7 @@ use Google\Protobuf\GPBEmpty;
 use Google\Protobuf\Internal\Message;
 use Haskel\GrpcWebBundle\Constant\ProtocolContentType;
 use Haskel\GrpcWebBundle\GrpcResponse;
-use Haskel\GrpcWebBundle\Interface\GrpcResponseBuilderInterface;
+use Haskel\GrpcWebBundle\Service\GrpcResponseBuilderInterface;
 use Haskel\GrpcWebBundle\Message\LengthPrefixedMessage;
 use Haskel\GrpcWebBundle\Message\StatusCode;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationSuccessEvent;

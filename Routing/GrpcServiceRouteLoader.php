@@ -5,10 +5,12 @@ namespace Haskel\GrpcWebBundle\Routing;
 
 use FilesystemIterator;
 use Haskel\GrpcWebBundle\Attribute\Service;
+use Haskel\GrpcWebBundle\Message\GrpcMode;
 use RecursiveCallbackFilterIterator;
 use RecursiveIteratorIterator;
 use ReflectionClass;
 use ReflectionMethod;
+use RuntimeException;
 use SplFileInfo;
 use Symfony\Component\Config\FileLocatorInterface;
 use Symfony\Component\Routing\Loader\AnnotationClassLoader;
@@ -30,7 +32,7 @@ class GrpcServiceRouteLoader extends AnnotationDirectoryLoader
     public function load($path, string $type = null): RouteCollection
     {
         if (true === $this->isLoaded) {
-            throw new \RuntimeException('Do not add the "grpc" loader twice');
+            throw new RuntimeException('Do not add the "grpc" loader twice');
         }
 
         $files = iterator_to_array(new RecursiveIteratorIterator(
@@ -56,15 +58,31 @@ class GrpcServiceRouteLoader extends AnnotationDirectoryLoader
                     continue;
                 }
 
-                $servicePath = null;
+                $name = null;
+                $package = null;
+                $path = null;
                 foreach ($reflectionClass->getAttributes(Service::class) as $attr) {
                     $arguments = $attr->getArguments();
-                    $servicePath = $arguments[0] ?? null;
+                    $name = $arguments[0] ?? $arguments['name'] ?? null;
+                    $package = $arguments[1] ?? $arguments['package'] ?? null;
+                    $path = $arguments[3] ?? $arguments['path'] ?? null;
                 }
 
-                if ($servicePath === null) {
+                if ($path && $name) {
+                    throw new RuntimeException('Service path and name cannot be specified at the same time');
+                }
+
+                if ($name === null || $path === null) {
                     // todo: log warning
                     continue;
+                }
+
+                if ($path) {
+                    $path = '/' . $path;
+                }
+
+                if ($name) {
+                    $path = '/' . ($package ? $package . "." : "") . $name;
                 }
 
                 $methods = $reflectionClass->getMethods(ReflectionMethod::IS_PUBLIC);
@@ -77,20 +95,20 @@ class GrpcServiceRouteLoader extends AnnotationDirectoryLoader
                         continue;
                     }
 
-                    $name = str_replace("/", "", $servicePath) . '_' . $method->getName();
+                    $routeName = str_replace("/", "", $path) . '_' . $method->getName();
+                    $routePath = $path . "/" . $method->getName();
 
-                    $route = new Route(
-                        $servicePath . "/" . $method->getName(),
-                        [
-                            '_controller' => $class . '::' . $method->getName(),
-                        ],
-                        [],
-                        [],
-                        null,
-                        [],
-                        ['POST'],
+                    $routes->add(
+                        $routeName,
+                        new Route(
+                            $routePath,
+                            [
+                                '_controller' => $class . '::' . $method->getName(),
+                            ],
+                            host: null,
+                            methods: ['POST'],
+                        )
                     );
-                    $routes->add($name, $route);
                 }
             }
         }
@@ -102,6 +120,6 @@ class GrpcServiceRouteLoader extends AnnotationDirectoryLoader
 
     public function supports($resource, string $type = null): bool
     {
-        return 'grpc-web' === $type;
+        return GrpcMode::GrpcWeb->value === $type;
     }
 }

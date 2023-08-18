@@ -6,6 +6,7 @@ namespace Haskel\GrpcWebBundle\DependencyInjection;
 
 use Haskel\GrpcWebBundle\Attribute\Service;
 use Haskel\GrpcWebBundle\Constant\Tag;
+use InvalidArgumentException;
 use ReflectionClass;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ChildDefinition;
@@ -37,33 +38,47 @@ class GrpcWebExtension extends Extension
             }
         );
 
-        $authentificator = $container->getDefinition('haskel.grpc_web.security.grpc_login_authenticator');
+        $this->configureSecurity($config, $container);
+    }
 
-        if (!isset($config['security']['sign_in_request_class'])) {
-            throw new \InvalidArgumentException('You must provide a sign in request class');
+    private function configureSecurity(array $config, ContainerBuilder $container): void
+    {
+        if (!isset($config['security'])) {
+            return;
         }
-        $authentificator->setArgument('$signInRequestClass', $config['security']['sign_in_request_class']);
 
-        if (isset($config['security']['identifier_field'])) {
-            $authentificator->setArgument('$identifierField', $config['security']['identifier_field']);
+        $securityConfig = $config['security'];
+        $authenticator = $container->getDefinition('haskel.grpc_web.security.grpc_login_authenticator');
+
+        if (!isset($securityConfig['sign_in_request_class'])) {
+            throw new InvalidArgumentException('You must provide a sign in request class');
         }
-        if (isset($config['security']['password_field'])) {
-            $authentificator->setArgument('$passwordField', $config['security']['password_field']);
+        $authenticator->setArgument('$signInRequestClass', $securityConfig['sign_in_request_class']);
+
+        if (isset($securityConfig['identifier_field'])) {
+            $authenticator->setArgument('$identifierField', $securityConfig['identifier_field']);
         }
-        if (isset($config['security']['jwt_cookie_builder'])) {
-            $jwtCookieBuilder = new Definition($config['security']['jwt_cookie_builder']);
+
+        if (isset($securityConfig['password_field'])) {
+            $authenticator->setArgument('$passwordField', $securityConfig['password_field']);
+        }
+
+        if (isset($securityConfig['jwt_cookie_builder'])) {
+            $jwtCookieBuilder = new Definition($securityConfig['jwt_cookie_builder']);
             $jwtCookieBuilder->setAutowired(true);
-            $authentificator->setArgument('$jwtCookieBuilder', $jwtCookieBuilder);
+            $authenticator->setArgument('$jwtCookieBuilder', $jwtCookieBuilder);
         }
-        if (isset($config['security']['success_response_builder'])) {
-            $successResponseBuilder = new Definition($config['security']['success_response_builder']);
+
+        if (isset($securityConfig['success_response_builder'])) {
+            $successResponseBuilder = new Definition($securityConfig['success_response_builder']);
             $successResponseBuilder->setAutowired(true);
-            $authentificator->setArgument('$successResponseBuilder', $successResponseBuilder);
+            $authenticator->setArgument('$successResponseBuilder', $successResponseBuilder);
         }
-        if (isset($config['security']['failure_response_builder'])) {
-            $failureResponseBuilder = new Definition($config['security']['failure_response_builder']);
+
+        if (isset($securityConfig['failure_response_builder'])) {
+            $failureResponseBuilder = new Definition($securityConfig['failure_response_builder']);
             $failureResponseBuilder->setAutowired(true);
-            $authentificator->setArgument('$failureResponseBuilder', $failureResponseBuilder);
+            $authenticator->setArgument('$failureResponseBuilder', $failureResponseBuilder);
         }
     }
 }

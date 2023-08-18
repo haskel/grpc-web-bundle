@@ -8,7 +8,8 @@ namespace Haskel\GrpcWebBundle\Attribute;
 class Service
 {
     public function __construct(
-        public readonly string $path = '',
+        public readonly ?string $name = null,
+        public readonly ?string $package = null,
     ) {
     }
 }
